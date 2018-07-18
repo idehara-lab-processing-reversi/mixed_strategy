@@ -25,6 +25,7 @@ int KUROBAN = HITO;
 int SHIROBAN = COMP;
 
 int[][] ban;
+
 int teban;
 // 連続パス回数
 int passcount;
@@ -78,6 +79,8 @@ void showBan(int[][] b)
   if( (KUROBAN == COMP && teban == KURO) || (SHIROBAN == COMP && teban == SHIRO) )
     autoPutStone();
 
+  Stone[][] fixed = getFixed(b);
+
   background(0,96,0);
   for(int i=0; i<9; i++)
   {
@@ -111,6 +114,14 @@ void showBan(int[][] b)
         fill(255,0,0);
         ellipse( round((x-0.5)*CELLSIZE), round((y-0.5)*CELLSIZE), 10,10);
       }
+      if( fixed[x][y].isFixed )
+      {
+        fill(200,255,200);
+        stroke(200,255,200);
+        ellipse( round((x-0.5)*CELLSIZE), round((y-0.5)*CELLSIZE), 5,5);
+        stroke(0);
+      }
+      
     }
   }
 }
@@ -237,7 +248,7 @@ int put(int[][] b, int te, int x, int y)
   result += putSub(b, te, x, y,  1,  1);
 
   b[x][y] = te;
-  return 0;
+  return result;
 }
 
 // 置ける場所を数える関数（盤面 b、手番 te）　→　答：置ける場所の数
@@ -345,9 +356,11 @@ int evaluateMove(int[][] b, int te, int x, int y)
 
   // 置こうとしている場所の点数
   int positionPoint = tensu[x][y];
+  
+  int fc = getFixedCount(nextBan, te);
 
   // とりあえず、「場所の点数が高くて石をたくさんひっくり返せる手」を「良い手」と判定する。
-  result = positionPoint * 3 - 5 * stoneCount - nextBestMove.value * 5 + 20 / (nextMoveCount + 1);
+  result = positionPoint * 3 - 5 * stoneCount - nextBestMove.value * 5 + 20 / (nextMoveCount + 1) + fc * 10;
 
   println( "( " + x + "," + y + ") = " + result);
 
@@ -376,6 +389,25 @@ Move getBestMove(int[][] b, int te)
   return result;
 }
 
+int getFixedCount(int[][] b, int te)
+{
+  int result = 0;
+  Stone[][] fixed = getFixed(b);
+  for(int y=1; y<=8; y++)
+    for(int x=1; x<=8; x++)
+    {
+      if( fixed[x][y].isFixed )
+      {
+        if( fixed[x][y].c == te )
+          result++;
+        else
+          result--;
+      }
+    }
+    
+  return result;
+}
+
 // 盤面をコピーして返す。ディープコピーされているので、コピーされた盤に何をしても構わない。
 int[][] banCopy(int[][] b)
 {
@@ -383,5 +415,74 @@ int[][] banCopy(int[][] b)
   for(int y=0; y<10; y++)
     for(int x=0; x<10; x++)
       result[x][y] = b[x][y];
+  return result;
+}
+
+Stone[][] getFixed(int[][] ban)
+{
+  Stone[][] result = prepareFixed(ban);
+  
+  getFixedFrom(ban, result, 1, 1, 1, 1);
+  getFixedFrom(ban, result, 8, 1,-1, 1);
+  getFixedFrom(ban, result, 1, 8, 1,-1);
+  getFixedFrom(ban, result, 8, 8,-1,-1);
+  
+  boolean update = true;
+  while( update == true )
+  {
+    update = false;
+    for(int y=1; y<=8; y++)
+      for(int x=1; x<=8; x++)
+      {
+        update = update || result[x][y].updateFixed();
+      }
+  }
+  
+  return result;
+}
+
+void getFixedFrom(int[][] ban, Stone[][] fixed, int sx, int sy, int dx, int dy)
+{
+  int x,y;
+  int te = ban[sx][sy];
+  if( te == AKI )
+    return;
+  
+  for(y=sy; ban[sx][y]==te; y+=dy)
+  {
+    fixed[sx][y].updateFixed();
+  }
+  for(x=sx; ban[x][sy]==te; x+=dx)
+  {
+    fixed[x][sy].updateFixed();
+  } 
+}
+
+Stone[][] prepareFixed(int[][] b)
+{
+  Stone[][] result = new Stone[10][10];
+  
+  for(int y=0; y<10; y++)
+    for(int x=0; x<10; x++)
+    {
+      result[x][y] = new Stone();
+      result[x][y].c = b[x][y];
+      result[x][y].isFixed = (x==0 || y==0 || x==9 || y==9) ? true : false;   
+    }
+
+  for(int y=1; y<=8; y++)
+    for(int x=1; x<=8; x++)
+    {
+      result[x][y].setAdjacentStone( result[x+1][y  ], 0);
+      result[x][y].setAdjacentStone( result[x+1][y+1], 1);
+      result[x][y].setAdjacentStone( result[x  ][y+1], 2);
+      result[x][y].setAdjacentStone( result[x-1][y+1], 3);
+      result[x][y].setAdjacentStone( result[x-1][y  ], 4);
+      result[x][y].setAdjacentStone( result[x-1][y-1], 5);
+      result[x][y].setAdjacentStone( result[x  ][y-1], 6);
+      result[x][y].setAdjacentStone( result[x+1][y-1], 7);
+    }
+
+  
   return result;
 }
