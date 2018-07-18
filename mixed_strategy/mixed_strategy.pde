@@ -27,6 +27,7 @@ int SHIROBAN = COMP;
 int[][] ban;
 
 int teban;
+int tesu = 0;
 // 連続パス回数
 int passcount;
 
@@ -116,7 +117,7 @@ void showBan(int[][] b)
       }
       if( fixed[x][y].isFixed )
       {
-        fill(200,255,200);
+        fill(64,196,64);
         stroke(200,255,200);
         ellipse( round((x-0.5)*CELLSIZE), round((y-0.5)*CELLSIZE), 5,5);
         stroke(0);
@@ -145,6 +146,7 @@ void mouseClicked()
   {
     put(ban, teban, gx, gy);
     teban = -teban;
+    tesu++;
     // 石をおいたので、連続パス回数は０回に戻る
     passcount = 0;
   }
@@ -296,6 +298,7 @@ void autoPutStone()
   {
     put(ban, teban, m.x, m.y);
     teban = -teban;
+    tesu++;
     passcount = 0;
   }
   // パスなら、手番を変える。連続パス回数を１増やす。
@@ -316,7 +319,10 @@ Move getMove(int[][] b, int te)
     {
       if( turn(b, te, x, y) != 0 )
       {
-        int newScore = evaluateMove(b, te, x, y);
+        print(" (" + x + "," + y + ") ");
+        int depth = (tesu > 50) ? 6 : 4;
+        int newScore = evaluateMoveR(b, te, x, y, depth);
+        print(newScore);
         // もしも新しい手の価値のほうが、今覚えている手の価値より高いならば
         if( newScore >= currentScore )
         {
@@ -325,7 +331,9 @@ Move getMove(int[][] b, int te)
           result.y = y;
           // 新しい手の価値を覚える
           currentScore = newScore;
+          print("*");
         }
+        println("");
       }
     }
   }
@@ -360,9 +368,7 @@ int evaluateMove(int[][] b, int te, int x, int y)
   int fc = getFixedCount(nextBan, te);
 
   // とりあえず、「場所の点数が高くて石をたくさんひっくり返せる手」を「良い手」と判定する。
-  result = positionPoint * 3 - 5 * stoneCount - nextBestMove.value * 5 + 20 / (nextMoveCount + 1) + fc * 10;
-
-  println( "( " + x + "," + y + ") = " + result);
+  result = positionPoint * 5 - 1 * stoneCount - nextBestMove.value * 5 + 100 / (nextMoveCount + 1) + fc * 10;
 
   return result;
 }
@@ -482,7 +488,70 @@ Stone[][] prepareFixed(int[][] b)
       result[x][y].setAdjacentStone( result[x  ][y-1], 6);
       result[x][y].setAdjacentStone( result[x+1][y-1], 7);
     }
-
   
   return result;
+}
+
+int getCountSimple(int[][] b, int te)
+{
+  int result = 0;
+  for(int y=1; y<=8; y++)
+    for(int x=1; x<=8; x++)
+    {
+        if( b[x][y] == te )
+          result++;
+        else if( b[x][y] == -te)
+          result--;
+    }
+    
+  return result;
+}  
+
+int evaluateMoveR(int[][] b, int te, int x, int y, int depth)
+{
+  if( depth <= 0 )
+    return( evaluateMove(b, te, x, y) );
+
+  int[][] nextBan = banCopy(b);
+  put(nextBan, te, x, y);
+
+  boolean pass = true;
+
+  int opBest = -99999999;
+  for(int ny=1; ny<=8; ny++)
+    for(int nx=1; nx<=8; nx++)
+    {
+      if( turn(nextBan, -te, nx, ny) != 0 )
+      {
+        int eval = evaluateMoveR( nextBan, -te, nx, ny, depth-1 );
+        if( eval > opBest )
+        {
+          opBest = eval;
+          pass = false;
+        }
+      }
+    }
+
+  if( !pass )
+    return -opBest + tensu[x][y];
+  
+  int myBest = -999999999;
+  for(int ny=1; ny<=8; ny++)
+    for(int nx=1; nx<=8; nx++)
+    {
+      if( turn(nextBan, te, nx, ny) != 0 )
+      {
+        int eval = evaluateMoveR( nextBan, te, nx, ny, depth-1 );
+        if( eval > myBest )
+        {
+          myBest = eval;
+          pass = false;
+        }
+      }
+    }
+    
+  if( !pass )
+    return myBest + tensu[x][y];
+    
+  return getCountSimple(nextBan, te) * 10000;
 }
