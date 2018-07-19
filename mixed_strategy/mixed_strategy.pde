@@ -30,6 +30,7 @@ int teban;
 int tesu = 0;
 // 連続パス回数
 int passcount;
+boolean waitOneFrame;
 
 void setup()
 {
@@ -37,6 +38,7 @@ void setup()
   passcount = 0;
 
   size(640, 640);
+  surface.setSize(640, 640);
   ban = new int[10][10];
   for(int y=0; y<10; y++)
   {
@@ -76,11 +78,21 @@ void showBan(int[][] b)
     showResult(ban);
   }
 
+
+
   // コンピュータの番ならば、石を置く
   if( (KUROBAN == COMP && teban == KURO) || (SHIROBAN == COMP && teban == SHIRO) )
-    autoPutStone();
+    if( waitOneFrame )
+    {
+      waitOneFrame = false;
+    }
+    else
+    {
+      autoPutStone();
+      waitOneFrame = true;
+    }
 
-  Stone[][] fixed = getFixed(b);
+//  Stone[][] fixed = getFixed(b);
 
   background(0,96,0);
   for(int i=0; i<9; i++)
@@ -112,9 +124,10 @@ void showBan(int[][] b)
       // おける場所には赤丸
       if( turn(ban, teban, x, y) != 0 )
       {
-        fill(255,0,0);
-        ellipse( round((x-0.5)*CELLSIZE), round((y-0.5)*CELLSIZE), 10,10);
+        fill( (teban==SHIRO ? 255 : 0) );
+        ellipse( round((x-0.5)*CELLSIZE), round((y-0.5)*CELLSIZE), 5,5);
       }
+      /*
       if( fixed[x][y].isFixed )
       {
         fill(64,196,64);
@@ -122,7 +135,7 @@ void showBan(int[][] b)
         ellipse( round((x-0.5)*CELLSIZE), round((y-0.5)*CELLSIZE), 5,5);
         stroke(0);
       }
-      
+      */
     }
   }
 }
@@ -312,7 +325,7 @@ void autoPutStone()
 Move getMove(int[][] b, int te)
 {
   Move result = new Move();
-  int currentScore = -999999;
+  float currentScore = -999999;
   for(int y=1; y<=8; y++)
   {
     for(int x=1; x<=8; x++)
@@ -320,9 +333,9 @@ Move getMove(int[][] b, int te)
       if( turn(b, te, x, y) != 0 )
       {
         print(" (" + x + "," + y + ") ");
-        int depth = (tesu > 50) ? 6 : 4;
-        int newScore = evaluateMoveR(b, te, x, y, depth);
-        print(newScore);
+        int depth = (tesu > 48) ? 6 : 4;
+        float newScore = evaluateMoveR(b, te, x, y, depth, 99999999);
+        print(newScore, " ");
         // もしも新しい手の価値のほうが、今覚えている手の価値より高いならば
         if( newScore >= currentScore )
         {
@@ -343,9 +356,9 @@ Move getMove(int[][] b, int te)
 }
 
 // 「盤面 b で、手番 te の人が (x,y) に置く」という手の得点を計算して返す。
-int evaluateMove(int[][] b, int te, int x, int y)
+float evaluateMove(int[][] b, int te, int x, int y)
 {
-  int result;
+  float result;
 
   // 次の局面を作っておく
   int[][] nextBan = banCopy(b);
@@ -368,7 +381,7 @@ int evaluateMove(int[][] b, int te, int x, int y)
   int fc = getFixedCount(nextBan, te);
 
   // とりあえず、「場所の点数が高くて石をたくさんひっくり返せる手」を「良い手」と判定する。
-  result = positionPoint * 5 - 1 * stoneCount - nextBestMove.value * 5 + 100 / (nextMoveCount + 1) + fc * 10;
+  result = positionPoint * 5 - 1 * stoneCount - nextBestMove.value * 5 + 60 / (nextMoveCount + 1) + fc * 10;
 
   return result;
 }
@@ -507,7 +520,7 @@ int getCountSimple(int[][] b, int te)
   return result;
 }  
 
-int evaluateMoveR(int[][] b, int te, int x, int y, int depth)
+float evaluateMoveR(int[][] b, int te, int x, int y, int depth, float alpha)
 {
   if( depth <= 0 )
     return( evaluateMove(b, te, x, y) );
@@ -516,18 +529,21 @@ int evaluateMoveR(int[][] b, int te, int x, int y, int depth)
   put(nextBan, te, x, y);
 
   boolean pass = true;
+  float target = - (alpha - tensu[x][y]);
 
-  int opBest = -99999999;
+  float opBest = -99999999;
   for(int ny=1; ny<=8; ny++)
     for(int nx=1; nx<=8; nx++)
     {
       if( turn(nextBan, -te, nx, ny) != 0 )
       {
-        int eval = evaluateMoveR( nextBan, -te, nx, ny, depth-1 );
+        float eval = evaluateMoveR( nextBan, -te, nx, ny, depth-1, opBest );
         if( eval > opBest )
         {
           opBest = eval;
           pass = false;
+          if( opBest > target )
+            return -opBest + tensu[x][y];
         }
       }
     }
@@ -535,13 +551,13 @@ int evaluateMoveR(int[][] b, int te, int x, int y, int depth)
   if( !pass )
     return -opBest + tensu[x][y];
   
-  int myBest = -999999999;
+  float myBest = -999999999;
   for(int ny=1; ny<=8; ny++)
     for(int nx=1; nx<=8; nx++)
     {
       if( turn(nextBan, te, nx, ny) != 0 )
       {
-        int eval = evaluateMoveR( nextBan, te, nx, ny, depth-1 );
+        float eval = evaluateMoveR( nextBan, te, nx, ny, depth-1, 99999999 );
         if( eval > myBest )
         {
           myBest = eval;
