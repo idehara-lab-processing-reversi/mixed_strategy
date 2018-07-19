@@ -21,8 +21,8 @@ final int[][] tensu =
     {0,9,  -1,3,2,2,3,  -1,9,0},
     {0,0,  0,0,0,0,0,0,0,0} };
 
-int KUROBAN = HITO;
-int SHIROBAN = COMP;
+int KUROBAN = COMP;
+int SHIROBAN = HITO;
 
 int[][] ban;
 
@@ -31,6 +31,8 @@ int tesu = 0;
 // 連続パス回数
 int passcount;
 boolean waitOneFrame;
+int variationCount;
+int baseDepth = 4;
 
 void setup()
 {
@@ -326,6 +328,11 @@ Move getMove(int[][] b, int te)
 {
   Move result = new Move();
   float currentScore = -999999;
+  variationCount = 0;
+  int depth = (tesu > 48) ? baseDepth+2 : baseDepth;
+  
+  println("----- Depth " + depth + " search start! -----");
+
   for(int y=1; y<=8; y++)
   {
     for(int x=1; x<=8; x++)
@@ -333,8 +340,7 @@ Move getMove(int[][] b, int te)
       if( turn(b, te, x, y) != 0 )
       {
         print(" (" + x + "," + y + ") ");
-        int depth = (tesu > 48) ? 6 : 4;
-        float newScore = evaluateMoveR(b, te, x, y, depth, 99999999);
+        float newScore = evaluateMoveR(b, te, x, y, depth, currentScore);
         print(newScore, " ");
         // もしも新しい手の価値のほうが、今覚えている手の価値より高いならば
         if( newScore >= currentScore )
@@ -350,7 +356,19 @@ Move getMove(int[][] b, int te)
       }
     }
   }
-  println("-----");
+  println("----- " + currentScore + " in " + variationCount + " variations");
+  
+  if( variationCount > 8000 )
+    baseDepth--;
+  else if ( variationCount < 2000 )
+    baseDepth++;
+    
+  if( currentScore < -8 )
+  {
+    println("***** Entering Emergency Mode *****");
+    baseDepth++;
+  }
+  
   result.value = currentScore;
   return result;
 }
@@ -381,7 +399,7 @@ float evaluateMove(int[][] b, int te, int x, int y)
   int fc = getFixedCount(nextBan, te);
 
   // とりあえず、「場所の点数が高くて石をたくさんひっくり返せる手」を「良い手」と判定する。
-  result = positionPoint * 5 - 1 * stoneCount - nextBestMove.value * 5 + 60 / (nextMoveCount + 1) + fc * 10;
+  result = positionPoint * 5 - 1 * stoneCount - nextBestMove.value * 5 + 60 / (nextMoveCount + 1.0) + fc * 10;
 
   return result;
 }
@@ -527,6 +545,7 @@ float evaluateMoveR(int[][] b, int te, int x, int y, int depth, float alpha)
 
   int[][] nextBan = banCopy(b);
   put(nextBan, te, x, y);
+  variationCount++;
 
   boolean pass = true;
   float target = - (alpha - tensu[x][y]);
@@ -538,7 +557,7 @@ float evaluateMoveR(int[][] b, int te, int x, int y, int depth, float alpha)
       if( turn(nextBan, -te, nx, ny) != 0 )
       {
         float eval = evaluateMoveR( nextBan, -te, nx, ny, depth-1, opBest );
-        if( eval > opBest )
+        if( eval > opBest || (eval == opBest && random(1.0) < 0.2f))
         {
           opBest = eval;
           pass = false;
