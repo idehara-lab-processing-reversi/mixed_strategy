@@ -399,7 +399,7 @@ float evaluateMove(int[][] b, int te, int x, int y)
   int fc = getFixedCount(nextBan, te);
 
   // とりあえず、「場所の点数が高くて石をたくさんひっくり返せる手」を「良い手」と判定する。
-  result = positionPoint * 5 - 1 * stoneCount - nextBestMove.value * 5 + 60 / (nextMoveCount + 1.0) + fc * 10;
+  result = positionPoint * 5 - 1 * stoneCount - nextBestMove.value * 5 + 20 / (nextMoveCount + 1.0) + fc * 10;
 
   return result;
 }
